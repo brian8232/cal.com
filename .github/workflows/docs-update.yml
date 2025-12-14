@@ -26,15 +26,17 @@ jobs:
         with:
           node-version: '18'
       
-      - name: Install dependencies globally
+      - name: Create temporary package.json for dependencies
         run: |
-          npm install -g @anthropic-ai/sdk @notionhq/client
+          echo '{"name":"temp","version":"1.0.0"}' > temp-package.json
+          npm install --prefix . --no-save --package-lock=false @anthropic-ai/sdk @notionhq/client
       
       - name: Run documentation generator
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NODE_PATH: ./node_modules
         run: |
           node scanner.js .
       
