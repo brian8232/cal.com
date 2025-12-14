@@ -106,15 +106,20 @@ async function createNotionPage(featureData, filePaths) {
   
   try {
     // Check if page already exists
-    const existingPages = await notion.databases.query({
-      database_id: DATABASE_ID,
-      filter: {
-        property: 'Name',
-        title: {
-          equals: featureName
+    let existingPages = { results: [] };
+    try {
+      existingPages = await notion.databases.query({
+        database_id: DATABASE_ID,
+        filter: {
+          property: 'Name',
+          title: {
+            equals: featureName
+          }
         }
-      }
-    });
+      });
+    } catch (queryError) {
+      console.log(`  Note: Could not query existing pages, will create new page`);
+    }
 
     // Generate Mermaid chart URL
     const mermaidImageUrl = `https://mermaid.ink/img/${Buffer.from(flowchart).toString('base64')}`;
@@ -289,37 +294,48 @@ async function createNotionPage(featureData, filePaths) {
     ];
 
     let pageId;
-    if (existingPages.results.length > 0) {
+    if (existingPages.results && existingPages.results.length > 0) {
       // Update existing page - delete old blocks and add new ones
       pageId = existingPages.results[0].id;
       
-      // Update properties
-      await notion.pages.update({
-        page_id: pageId,
-        properties: {
-          'Name': {
-            title: [{ text: { content: featureName } }]
-          },
-          'Last Updated': {
-            date: { start: new Date().toISOString() }
-          },
-          'File Path': {
-            rich_text: [{ text: { content: filePaths } }]
+      try {
+        // Update properties
+        await notion.pages.update({
+          page_id: pageId,
+          properties: {
+            'Name': {
+              title: [{ text: { content: featureName } }]
+            },
+            'Last Updated': {
+              date: { start: new Date().toISOString() }
+            },
+            'File Path': {
+              rich_text: [{ text: { content: filePaths } }]
+            }
+          }
+        });
+        
+        // Get existing blocks and delete them
+        const existingBlocks = await notion.blocks.children.list({
+          block_id: pageId
+        });
+        
+        for (const block of existingBlocks.results) {
+          try {
+            await notion.blocks.delete({ block_id: block.id });
+          } catch (e) {
+            // Ignore deletion errors
           }
         }
-      });
-      
-      // Get existing blocks and delete them
-      const existingBlocks = await notion.blocks.children.list({
-        block_id: pageId
-      });
-      
-      for (const block of existingBlocks.results) {
-        await notion.blocks.delete({ block_id: block.id });
+        
+        console.log(`✓ Updated: ${featureName}`);
+      } catch (updateError) {
+        console.log(`  Warning: Could not update existing page, creating new one`);
+        pageId = null;
       }
-      
-      console.log(`✓ Updated: ${featureName}`);
-    } else {
+    }
+    
+    if (!pageId) {
       // Create new page
       const newPage = await notion.pages.create({
         parent: { database_id: DATABASE_ID },
