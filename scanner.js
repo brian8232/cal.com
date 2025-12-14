@@ -27,7 +27,7 @@ async function getCodeFiles(dir, fileList = []) {
     
     if (stat.isDirectory()) {
       // Skip common directories
-      if (!['node_modules', '.git', 'dist', 'build', 'coverage'].includes(file)) {
+      if (!['node_modules', '.git', 'dist', 'build', 'coverage', '__tests__', 'test'].includes(file)) {
         await getCodeFiles(filePath, fileList);
       }
     } else {
@@ -43,13 +43,15 @@ async function getCodeFiles(dir, fileList = []) {
 
 // Analyze entire feature/module with Claude
 async function analyzeFeature(featureName, codeFiles) {
-  console.log(`\nAnalyzing ${featureName} feature with ${codeFiles.length} files...`);
+  console.log(`\nAnalyzing ${featureName} with ${codeFiles.length} files...`);
   
   // Prepare all code content
   let allCode = '';
   for (const file of codeFiles) {
     const code = await fs.readFile(file.path, 'utf-8');
-    allCode += `\n\n--- File: ${file.name} ---\n${code}`;
+    // Limit individual file size to prevent token overflow
+    const truncatedCode = code.length > 5000 ? code.substring(0, 5000) + '\n... (truncated)' : code;
+    allCode += `\n\n--- File: ${file.name} ---\n${truncatedCode}`;
   }
   
   const prompt = `You are analyzing a complete feature/module from a codebase. Review all the files provided and create comprehensive documentation.
@@ -353,30 +355,95 @@ async function createNotionPage(featureData, filePaths) {
 // Main function
 async function main() {
   try {
-    // Target the Backbone example specifically
-    const featurePath = './packages/features/bookings';
+    // ====================================================================
+    // CONFIGURE YOUR FEATURES HERE
+    // ====================================================================
+    // Define multiple features to analyze as separate documentation pages
+    // Each feature gets its own Notion page
     
-    console.log(`Scanning Cal.com at: ${featurePath}`);
+    const features = [
+      {
+        name: 'Booker Component',
+        path: './packages/features/bookings/Booker',
+        maxFiles: 50  // Limit files to avoid rate limits
+      },
+      {
+        name: 'Booking Components',
+        path: './packages/features/bookings/components',
+        maxFiles: 50
+      },
+      {
+        name: 'Booking Lib',
+        path: './packages/features/bookings/lib',
+        maxFiles: 50
+      }
+      // Add more features here as needed:
+      // {
+      //   name: 'Feature Name',
+      //   path: './path/to/feature',
+      //   maxFiles: 50
+      // }
+    ];
     
-    // Get all code files
-    const codeFiles = await getCodeFiles(featurePath);
-    console.log(`Found ${codeFiles.length} code files`);
+    // ====================================================================
     
-    // Prepare file info
-    const fileInfo = codeFiles.map(filePath => ({
-      path: filePath,
-      name: path.relative(featurePath, filePath)
-    }));
+    console.log(`\n🚀 Starting documentation generation for ${features.length} features...\n`);
     
-    // Analyze the entire feature as one unit
-    const analysis = await analyzeFeature('Cal.com Booking System', fileInfo);
+    let totalCost = 0;
     
-    // Create the Notion page
-    const filePaths = fileInfo.map(f => f.name).join(', ');
-    await createNotionPage(analysis, filePaths);
+    for (const feature of features) {
+      try {
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`Processing: ${feature.name}`);
+        console.log(`Path: ${feature.path}`);
+        console.log(`${'='.repeat(60)}`);
+        
+        // Get all code files
+        const allFiles = await getCodeFiles(feature.path);
+        console.log(`Found ${allFiles.length} code files`);
+        
+        // Limit files to avoid rate limits
+        const codeFiles = allFiles.slice(0, feature.maxFiles);
+        if (allFiles.length > feature.maxFiles) {
+          console.log(`Limiting to first ${feature.maxFiles} files to avoid rate limits`);
+        }
+        
+        // Prepare file info
+        const fileInfo = codeFiles.map(filePath => ({
+          path: filePath,
+          name: path.relative(feature.path, filePath)
+        }));
+        
+        // Analyze the feature
+        const analysis = await analyzeFeature(feature.name, fileInfo);
+        
+        // Create the Notion page
+        const filePaths = fileInfo.map(f => f.name).join(', ');
+        await createNotionPage(analysis, filePaths);
+        
+        // Estimate cost (very rough)
+        const estimatedCost = codeFiles.length * 0.03; // ~$0.03 per file
+        totalCost += estimatedCost;
+        console.log(`Estimated cost for this feature: ~$${estimatedCost.toFixed(2)}`);
+        
+        // Wait 3 seconds between features to avoid rate limits
+        if (features.indexOf(feature) < features.length - 1) {
+          console.log('\nWaiting 3 seconds before next feature...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+        
+      } catch (error) {
+        console.error(`\n❌ Error processing ${feature.name}:`, error.message);
+        console.log('Continuing with next feature...\n');
+      }
+    }
     
-    console.log('\n✓ Documentation generation complete!');
-    console.log(`📊 Cost estimate: ~$0.50-1.00 for this feature`);
+    console.log(`\n${'='.repeat(60)}`);
+    console.log('✅ Documentation generation complete!');
+    console.log(`📊 Total estimated cost: ~$${totalCost.toFixed(2)}`);
+    console.log(`📄 Created ${features.length} documentation pages in Notion`);
+    console.log(`${'='.repeat(60)}\n`);
+    
   } catch (error) {
     console.error('Error:', error);
     process.exit(1);
