@@ -26,12 +26,9 @@ jobs:
         with:
           node-version: '18'
       
-      - name: Install pnpm
-        run: npm install -g pnpm@8
-      
-      - name: Install dependencies
+      - name: Install dependencies globally
         run: |
-          pnpm add --no-save @anthropic-ai/sdk @notionhq/client
+          npm install -g @anthropic-ai/sdk @notionhq/client
       
       - name: Run documentation generator
         env:
