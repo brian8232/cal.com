@@ -354,9 +354,9 @@ async function createNotionPage(featureData, filePaths) {
 async function main() {
   try {
     // Target the Backbone example specifically
-    const featurePath = './examples/backbone';
+    const featurePath = './packages/features/bookings';
     
-    console.log(`Scanning Backbone TodoMVC at: ${featurePath}`);
+    console.log(`Scanning Cal.com at: ${featurePath}`);
     
     // Get all code files
     const codeFiles = await getCodeFiles(featurePath);
@@ -369,7 +369,7 @@ async function main() {
     }));
     
     // Analyze the entire feature as one unit
-    const analysis = await analyzeFeature('Backbone TodoMVC', fileInfo);
+    const analysis = await analyzeFeature('Cal.com Booking System', fileInfo);
     
     // Create the Notion page
     const filePaths = fileInfo.map(f => f.name).join(', ');
