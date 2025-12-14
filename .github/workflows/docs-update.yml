@@ -8,7 +8,7 @@ on:
     types: [closed]
     branches:
       - main
-  workflow_dispatch:
+  workflow_dispatch:  # Enables manual triggering
 
 jobs:
   update-docs:
@@ -25,6 +25,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+      
+      - name: Install pnpm
+        run: npm install -g pnpm@8
       
       - name: Install dependencies
         run: |
