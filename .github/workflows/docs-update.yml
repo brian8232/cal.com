@@ -28,7 +28,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          npm install @anthropic-ai/sdk @notionhq/client
+          npm install --legacy-peer-deps --no-save @anthropic-ai/sdk @notionhq/client
       
       - name: Run documentation generator
         env:
